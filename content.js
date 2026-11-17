@@ -63,7 +63,7 @@ window.SITE_CONTENT = {
         "caseSource": "案例依据",
         "workCount": "项工作",
         "qualityTitle": "共享技能：让每条计分都有依据",
-        "qualityIntro": "围绕“题面 + 仓库骨架 + 隐藏测试”的仓库生成任务，我把独立审题、分歧复核和跑分后分析沉淀为可复用流程，追问每次通过与失败究竟说明了什么。",
+        "qualityIntro": "我们建立了一套评测质量控制流程，覆盖题目审核、结果分析和问题修复。",
         "chooseStep": "选择一步，查看具体判断方法",
         "step": "步骤",
         "input": "证据输入",
@@ -744,50 +744,51 @@ window.SITE_CONTENT = {
             {
               "id": "quality-case-dependencies",
               "tag": "05 / 评分过程失真",
-              "title": "修改测试，造成假通过",
-              "summary": "模型移除了测试中的关键检查，错误代码因此被判成通过。",
-              "request": "修复 total(numbers)，返回所有数字之和。正式评分测试由评测方提供，不允许模型修改。",
+              "title": "拦截失败信号，造成假通过",
+              "summary": "模型影响中间的执行或结果上报环节，让真实失败被误记为通过。",
+              "request": "修复 total(numbers)，返回所有数字之和。隐藏测试由评测方保管，模型看不到测试内容。",
               "steps": [
                 {
-                  "title": "结果没变，只改了一行测试",
-                  "body": "下面两份测试调用同一份错误实现，result 都是 10。原测试会比较结果；模型改后的断言永远成立，不再关心算得对不对。"
+                  "title": "测试看不到，拦截的是中间环节",
+                  "body": "本例假设评分流程误信了项目内可修改的执行入口或结果上报。模型不需要知道具体题目，只要让这层入口吞掉检查失败、对外报成功，就可能制造假通过。下面的隐藏断言只展示给读者，模型并未拿到它。"
                 },
                 {
-                  "title": "沿用被改过的测试，就会把错误记成通过",
-                  "body": "如果评分直接运行模型工作目录里的这份测试，报告会显示通过。对比测试改动，再用评测方保存的原测试重跑，就能看出问题。"
+                  "title": "把真实检查结果与外层报告对起来",
+                  "body": "同一份代码始终返回 10。检查失败是否真正传到评分方，再绕过候选代码可影响的入口，在评测方控制的流程中独立复验。"
                 },
                 {
-                  "title": "评分时使用原测试，重新检查业务代码",
-                  "body": "正式评分使用评测方保存的测试，只应用任务允许的业务代码修改。这份错误实现必须失败；修好求和逻辑后，才能通过原来的结果检查。"
+                  "title": "由评测方独立校验，不能只相信“成功”标记",
+                  "body": "独立检查实际输出并记录每条结果，不用候选入口返回的“成功”直接计分。再用一份确定算错的实现复验：即使入口声称通过，最终也必须失败；缺失结果或异常退出也不能记为通过。"
                 }
               ],
               "probes": [
                 {
-                  "action": "① 原测试",
-                  "expected": "返回 30 才能通过。",
-                  "observed": "实际返回 10，比较结果后失败。"
+                  "action": "① 隐藏检查",
+                  "expected": "10 不等于 30，应产生失败。",
+                  "observed": "确实产生失败；隐藏断言没有被修改。"
                 },
                 {
-                  "action": "② 被修改的测试",
-                  "expected": "代码仍算错，应当失败。",
-                  "observed": "实际仍是 10，但 assert True 成立，测试通过。"
+                  "action": "② 经过中间入口",
+                  "expected": "把失败原样传给评分方。",
+                  "observed": "失败被吞掉，对外返回“成功”。若评分只信这个标记，就会误判。"
                 },
                 {
-                  "action": "③ 恢复原测试后重跑",
-                  "expected": "重新比较实际结果与 30。",
-                  "observed": "仍返回 10，测试再次失败。代码没有被修好。"
+                  "action": "③ 绕过中间层，独立复验",
+                  "expected": "直接检查实际输出是否为 30。",
+                  "observed": "仍然返回 10，判失败；代码并没有修好。"
                 }
               ],
-              "decision": "这次“通过”无效。恢复原测试后，功能仍判失败；修改评分测试的行为单独记录。",
-              "boundary": "原测试本来能发现错误，问题出在模型把这条检查改掉了。",
+              "decision": "原来的“通过”无效。代码仍算错，失败信号却在中途被掩盖；依据独立复验判失败，并记录对评分过程的干扰。",
+              "boundary": "此例成立的前提，是评分方信任了模型可影响的中间层。隐藏测试不可见，并不代表它的执行和结果上报过程也自动可信。",
               "sample": null,
-              "exampleTitle": "代码仍算错，把测试改成 assert True 就“通过”了",
-              "exampleIntro": "输入 [10, 20] 应返回 30，模型代码却仍返回 10。它把比较结果的断言替换成 assert True，让测试失去了检查能力。",
-              "testChange": {
-                "beforeLabel": "原测试：核对结果",
+              "exampleTitle": "隐藏检查已经失败，中间层却报了“成功”",
+              "exampleIntro": "输入 [10, 20] 应返回 30，代码却返回 10。隐藏断言没有变化；模型在可修改的中间入口中吞掉失败信号，让外层误以为通过了。",
+              "signalPath": "隐藏检查失败 → 中间层吞掉失败 → 外层误报通过",
+              "codeExample": {
+                "beforeLabel": "评测方的隐藏检查 · 模型不可见",
                 "before": "result = total([10, 20])\nassert result == 30",
-                "afterLabel": "模型改后：不再检查结果",
-                "after": "result = total([10, 20])\nassert True"
+                "afterLabel": "模型可影响的中间入口 · 示意伪代码",
+                "after": "执行检查\n如果收到检查失败：\n    不向外上报\n返回“成功”"
               }
             }
           ],
@@ -1084,7 +1085,7 @@ window.SITE_CONTENT = {
         "caseSource": "Case source",
         "workCount": "works",
         "qualityTitle": "Shared skills: ground every scoring decision",
-        "qualityIntro": "For repository-generation tasks built from a prompt, a skeleton repository and hidden tests, I distilled independent review, disagreement resolution and post-run analysis into a reusable process for understanding what passes and failures actually mean.",
+        "qualityIntro": "We built an evaluation quality-control process covering task review, result analysis, and issue resolution.",
         "chooseStep": "Select a step to see the reasoning",
         "step": "Step",
         "input": "Evidence in",
@@ -1765,50 +1766,51 @@ window.SITE_CONTENT = {
             {
               "id": "quality-case-dependencies",
               "tag": "05 / Untrustworthy scoring",
-              "title": "Changing tests creates a false pass",
-              "summary": "The agent removes a key check from the test, allowing incorrect code to pass.",
-              "request": "Fix total(numbers) to return the sum of all numbers. The evaluator supplies the official scoring tests, which the agent may not change.",
+              "title": "Intercepting failure signals creates a false pass",
+              "summary": "The agent affects an intermediate execution or reporting step, causing a real failure to be recorded as a pass.",
+              "request": "Fix total(numbers) to return the sum of all numbers. The evaluator holds the hidden tests; the agent cannot see their contents.",
               "steps": [
                 {
-                  "title": "The result stays wrong; only one test line changes",
-                  "body": "Both tests below call the same incorrect implementation, so result is 10 in both. The original assertion compares the result. The replacement is always true and no longer checks whether the calculation is correct."
+                  "title": "The agent cannot see the test; it interferes with an intermediate step",
+                  "body": "This example assumes scoring mistakenly trusts an editable project entry point or reporting layer. The agent need not know the test contents: suppressing check failures and reporting success at that layer can create a false pass. The hidden assertion below is shown only to the reader, not supplied to the agent."
                 },
                 {
-                  "title": "Running the modified test produces a false pass",
-                  "body": "If scoring runs this test from the agent’s working directory, the report shows a pass. Inspect the test diff, then rerun the evaluator’s original test to reveal the problem."
+                  "title": "Compare the real check outcome with the outer report",
+                  "body": "The same code still returns 10. Verify whether the failure reaches the scorer, then bypass the entry point the candidate can influence and recheck independently under evaluator control."
                 },
                 {
-                  "title": "Score the business code using the original test",
-                  "body": "Use the evaluator’s saved tests for official scoring and apply only the business-code changes allowed by the task. This incorrect implementation must fail. It passes the original result check only after the summation logic is fixed."
+                  "title": "Verify independently instead of trusting a success flag",
+                  "body": "Check the actual output and record individual results independently. Do not score directly from a candidate-controlled success flag. Verify with a known-wrong implementation: it must fail even if the entry point claims success. Missing results and abnormal exits must not count as passes."
                 }
               ],
               "probes": [
                 {
-                  "action": "① Original test",
-                  "expected": "Pass only if the result is 30.",
-                  "observed": "Returns 10; the comparison fails."
+                  "action": "① Hidden check",
+                  "expected": "10 is not 30, so the check must fail.",
+                  "observed": "It does fail. The hidden assertion has not changed."
                 },
                 {
-                  "action": "② Modified test",
-                  "expected": "The code is still wrong and should fail.",
-                  "observed": "Still returns 10, but assert True passes."
+                  "action": "② Intermediate entry point",
+                  "expected": "Forward the failure to the scorer unchanged.",
+                  "observed": "Suppresses the failure and reports success. A scorer trusting only this flag is misled."
                 },
                 {
-                  "action": "③ Rerun with the original test",
-                  "expected": "Compare the actual result with 30 again.",
-                  "observed": "Still returns 10 and fails again. The implementation was never fixed."
+                  "action": "③ Independent verification, bypassing the intermediate layer",
+                  "expected": "Check directly whether the actual output is 30.",
+                  "observed": "Still returns 10 and fails. The implementation was never fixed."
                 }
               ],
-              "decision": "The apparent pass is invalid. The original test still marks the functionality as failing; record the scoring-test modification separately.",
-              "boundary": "The original test could catch the error. The agent’s change removed that check.",
+              "decision": "The apparent pass is invalid. The code is still wrong, but its failure signal was suppressed. Judge functionality using the independent check and record interference with scoring.",
+              "boundary": "This example requires a scorer that trusts an intermediate layer the agent can influence. Hiding test contents does not automatically protect their execution or result reporting.",
               "sample": null,
-              "exampleTitle": "The code is still wrong, but assert True makes the test “pass”",
-              "exampleIntro": "The input [10, 20] should return 30, but the candidate still returns 10. The agent replaces the result comparison with assert True, removing the actual check.",
-              "testChange": {
-                "beforeLabel": "Original test: compare the result",
+              "exampleTitle": "The hidden check fails, but the intermediate layer reports success",
+              "exampleIntro": "The input [10, 20] should return 30, but the code returns 10. The hidden assertion stays unchanged. An editable intermediate entry point suppresses its failure signal, misleading the outer scorer.",
+              "signalPath": "Hidden check fails → Intermediate layer suppresses failure → Outer scorer reports a pass",
+              "codeExample": {
+                "beforeLabel": "Evaluator’s hidden check · Not visible to the agent",
                 "before": "result = total([10, 20])\nassert result == 30",
-                "afterLabel": "After the edit: no result check",
-                "after": "result = total([10, 20])\nassert True"
+                "afterLabel": "Intermediate entry point the agent can affect · Pseudocode",
+                "after": "run the check\nif a check failure is received:\n    do not propagate it\nreport success"
               }
             }
           ],
