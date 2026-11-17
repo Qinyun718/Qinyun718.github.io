@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="description" content="从 0 到 1 组建并带领团队，搭建完整 Coding Agent 评测体系，分享 Benchmark、评测集审核方法与后续研究方向。">
+  <meta name="theme-color" content="#f8fafc">
+  <title>共享技能 | 研究与实践</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/fonts.css">
+  <link rel="stylesheet" href="styles.css?v=2705060c3cbb">
+  <script src="content.js?v=29ab576edaa0" defer></script>
+  <script type="module" src="app.js?v=61741dabe106"></script>
+</head>
+<body data-page="skills">
+  <div id="site-header"><a class="skip-link" href="#main">跳到内容</a><header class="site-header wrap"><a class="wordmark" href="index.html"><span class="brand-symbol" aria-hidden="true">&lt;/&gt;</span>研究与实践</a><nav aria-label="主导航"><a href="index.html" >首页</a><a href="system.html" >评测体系</a><a href="benchmarks.html" >Benchmark</a><a href="skills.html" aria-current="page">共享技能</a><a href="future.html" >未来方向</a></nav><div class="language-switch" role="group" aria-label="选择语言"><button data-lang="zh" lang="zh-CN" aria-pressed="true">中文</button><button data-lang="en" lang="en" aria-pressed="false">English</button></div></header></div>
+  <main id="main" class="wrap"><header class="page-intro"><h1>共享技能：让每条计分都有依据</h1><p class="lead">围绕“题面 + 仓库骨架 + 隐藏测试”的仓库生成任务，我把独立审题、分歧复核和跑分后分析沉淀为可复用流程，追问每次通过与失败究竟说明了什么。</p></header>
+ <section class="quality-overview" aria-label="题目质量与评测分析"><article><h2>评分依据：从题面到每条断言</h2><p>把计分测试要求的行为逐条对应到模型可见的需求。参考实现用于核验；它的内部写法不会自动成为模型必须遵守的要求。</p></article><article><h2>失败归因：合理要求，也可能测错</h2><p>分别判断“这条测试有没有依据”和“这次为什么失败”。模型有 bug 不代表测试都合理；题面有缺口，也不代表它造成了本次失败。</p></article></section>
+ <section class="quality-cases" aria-labelledby="quality-case-title">
+ <header class="quality-case-heading"><h2 id="quality-case-title"><span id="deep-cases-title">五种典型情况，定位问题出在哪</span></h2><p class="deep-intro">把模型行为、测试判定和复查结果放在一起看，判断该修代码、补测试，还是修复评分过程。</p><p>方法教学示例 · 基于行为假设自拟，数字与实现仅用于演示，不代表真实模型记录或成绩</p></header>
+ <div class="deep-case-list"><details class="deep-case" id="quality-case-false-rejection">
+  <summary><span class="deep-case-tag">01 / 测试误判</span><h3>正确实现被额外要求判错</h3><p>测试加入了题目没有要求的限制，排除了本来合理的实现。</p><span class="deep-case-action">评测过程 <span aria-hidden="true">+</span></span></summary>
+  <div class="deep-case-content">
+   <header class="deep-example-heading"><p>具体例子</p><h4>算出了 30 和 3，测试仍判失败</h4><p>结果是对的，但测试额外要求调用某个函数，把合理写法错判为失败。</p></header>
+   <div class="deep-request"><strong>这道题的要求</strong><div><p>实现 column_sums(text)：读取带表头的 CSV，按列求数值之和，忽略空行，返回“列名 → 总和”的字典。</p><div class="quality-task-data case-input"><div><span>输入</span><pre>sales,refunds
+10,1
+
+20,2</pre></div><span class="data-arrow" aria-hidden="true">→</span><div><span>应返回</span><pre>{&quot;sales&quot;: 30, &quot;refunds&quot;: 3}</pre></div></div></div></div>
+   <ol class="deep-steps"><li><span class="sequence" aria-hidden="true">1</span><div><h4>模型做了什么</h4><p>代码算出了正确的 30 和 3，用的是自己写的求和逻辑。</p></div></li><li><span class="sequence" aria-hidden="true">2</span><div><h4>测试为什么这样判</h4><p>测试却要求代码调用参考答案里的某个函数，没调用就判失败。但题目根本没有这个要求。</p><div class="review-probes"><div class="probe-row"><h5>对照题目要求与实际判分</h5><dl><div><dt>应当看到</dt><dd>满足题面、返回 30 和 3 的实现应通过，无须调用指定函数。</dd></div><div><dt>实际看到</dt><dd>实际返回 30 和 3，却因为没调用指定函数而失败。</dd></div></dl></div></div></div></li><li><span class="sequence" aria-hidden="true">3</span><div><h4>怎么复查和修复</h4><p>改测试：检查题目要求的计算结果。只要满足要求，就应允许不同的代码写法。</p></div></li></ol>
+   <div class="deep-decision"><strong>最后怎么判</strong><p>测试误判。应检查题目要求的结果，并确认不同的正确写法都能通过。</p></div>
+  </div>
+ </details><details class="deep-case" id="quality-case-model-error">
+  <summary><span class="deep-case-tag">02 / 模型错误</span><h3>实现没有满足明确需求</h3><p>代码确实存在问题，测试失败反映了模型没有完成的要求。</p><span class="deep-case-action">评测过程 <span aria-hidden="true">+</span></span></summary>
+  <div class="deep-case-content">
+   <header class="deep-example-heading"><p>具体例子</p><h4>漏掉第二行，只算出 10 和 1</h4><p>实现漏掉了输入数据，测试正确发现了错误；这时应保留测试，分析模型为何失败。</p></header>
+   <div class="deep-request"><strong>这道题的要求</strong><div><p>实现 column_sums(text)：读取带表头的 CSV，按列求数值之和，忽略空行，返回“列名 → 总和”的字典。</p><div class="quality-task-data case-input"><div><span>输入</span><pre>sales,refunds
+10,1
+
+20,2</pre></div><span class="data-arrow" aria-hidden="true">→</span><div><span>应返回</span><pre>{&quot;sales&quot;: 30, &quot;refunds&quot;: 3}</pre></div></div></div></div>
+   <ol class="deep-steps"><li><span class="sequence" aria-hidden="true">1</span><div><h4>模型做了什么</h4><p>代码只算了第一行的 10 和 1，漏掉第二行的 20 和 2。</p></div></li><li><span class="sequence" aria-hidden="true">2</span><div><h4>测试为什么这样判</h4><p>正确答案是 30 和 3，实际却是 10 和 1。测试对比数字后判失败，这次判得对。</p><div class="review-probes"><div class="probe-row"><h5>对照题目要求与实际判分</h5><dl><div><dt>应当看到</dt><dd>应返回 30 和 3；返回 10 和 1 必须判失败。</dd></div><div><dt>实际看到</dt><dd>实际返回 10 和 1；测试核对数字，判失败。</dd></div></dl></div></div></div></li><li><span class="sequence" aria-hidden="true">3</span><div><h4>怎么复查和修复</h4><p>问题在模型代码。保留这条测试，记录模型漏处理了后续数据。</p></div></li></ol>
+   <div class="deep-decision"><strong>最后怎么判</strong><p>模型实现错误。保留失败结论，不因模型没通过就改题或放宽要求。</p></div>
+  </div>
+ </details><details class="deep-case" id="quality-case-missed-defect">
+  <summary><span class="deep-case-tag">03 / 测试漏检</span><h3>错误实现没有被测试发现</h3><p>关键结果或必要场景没有被验证，错误实现也能通过。</p><span class="deep-case-action">评测过程 <span aria-hidden="true">+</span></span></summary>
+  <div class="deep-case-content">
+   <header class="deep-example-heading"><p>具体例子</p><h4>同样算出 10 和 1，这次却通过</h4><p>同一份错误实现，只因测试没有核对结果，就被放过了。</p></header>
+   <div class="deep-request"><strong>这道题的要求</strong><div><p>实现 column_sums(text)：读取带表头的 CSV，按列求数值之和，忽略空行，返回“列名 → 总和”的字典。</p><div class="quality-task-data case-input"><div><span>输入</span><pre>sales,refunds
+10,1
+
+20,2</pre></div><span class="data-arrow" aria-hidden="true">→</span><div><span>应返回</span><pre>{&quot;sales&quot;: 30, &quot;refunds&quot;: 3}</pre></div></div></div></div>
+   <ol class="deep-steps"><li><span class="sequence" aria-hidden="true">1</span><div><h4>模型做了什么</h4><p>代码还是只算第一行，结果仍是错误的 10 和 1。</p></div></li><li><span class="sequence" aria-hidden="true">2</span><div><h4>测试为什么这样判</h4><p>测试只看“有没有返回内容”，没有核对数字。只要返回了内容就算通过，错答案也过关了。</p><div class="review-probes"><div class="probe-row"><h5>对照题目要求与实际判分</h5><dl><div><dt>应当看到</dt><dd>应返回 30 和 3；返回 10 和 1 必须判失败。</dd></div><div><dt>实际看到</dt><dd>实际返回 10 和 1；测试只检查返回非空，判通过。</dd></div></dl></div></div></div></li><li><span class="sequence" aria-hidden="true">3</span><div><h4>怎么复查和修复</h4><p>改测试：核对结果必须是 30 和 3。再拿这段算错的代码试一次，确认它会被判失败。</p></div></li></ol>
+   <div class="deep-decision"><strong>最后怎么判</strong><p>测试漏检。补上结果检查，再用这份错误实现确认它会被判失败。</p></div>
+  </div>
+ </details><details class="deep-case" id="quality-case-guess">
+  <summary><span class="deep-case-tag">04 / 迎合测试</span><h3>按猜测的测试范围实现功能</h3><p>模型为了兼容自己想象中的测试，不断添加特殊处理，反而改变了题目约定的行为。</p><span class="deep-case-action">评测过程 <span aria-hidden="true">+</span></span></summary>
+  <div class="deep-case-content">
+   <header class="deep-example-heading"><p>具体例子</p><h4>不断添加“兼容分支”，把非法配置也接受了</h4><p>模型猜测隐藏测试可能偏好各种容错行为，于是加上提取数字、负数转正、超限截断和出错回退。原测试只覆盖正常输入，这些改变需求的分支没有被发现。</p></header>
+   <div class="deep-request"><strong>这道题的要求</strong><div><p>为服务读取重试次数：命令行参数 --retries 优先于环境变量 APP_RETRIES，最后使用配置文件 retries；都未提供时默认 3。取值只能是 0–10 的整数，字符串必须是纯数字。已提供的最高优先级值若非法，必须报错，不能改写它，也不能回退到下一来源。</p></div></div>
+   <ol class="deep-steps"><li><span class="sequence" aria-hidden="true">1</span><div><h4>模型为猜测的测试不断增加特殊处理</h4><p>题目已经约定“非法值报错”，但模型把自己猜测的兼容需求也写进代码。原测试只检查正常整数及来源优先级，例如命令行传 4 时返回 4；这些测试全部通过，却没有触发下面的特殊分支。</p><div class="branch-map"><p class="branch-map-label">模型自行猜测 → 加上的特殊分支</p><div class="speculative-branches"><article><h5>“也许要接受带单位的数值”</h5><p>遇到“4次”，先提取数字，再当作 4 使用。</p></article><article><h5>“也许负数也应该兼容”</h5><p>遇到 -2，取绝对值，按 2 处理。</p></article><article><h5>“也许超范围需要自动纠正”</h5><p>遇到 12，截断到允许的上限 10。</p></article><article><h5>“也许读不懂时应该继续运行”</h5><p>高优先级值无法解析，就继续尝试下一来源。</p></article></div></div></div></li><li><span class="sequence" aria-hidden="true">2</span><div><h4>逐个触发额外分支，检查是否仍然遵守题目</h4><p>每行独立运行。复核不仅看程序有没有返回值，还检查它是否在该报错时真正报错。最后一行还要确认：不能因为环境变量非法，就悄悄改用配置文件。</p><div class="review-probes"><div class="probe-row"><h5>① 命令行传入“4次”</h5><dl><div><dt>应当看到</dt><dd>字符串不是纯数字，应报错。</dd></div><div><dt>实际看到</dt><dd>提取出 4，正常返回。多加的解析分支放过了非法输入。</dd></div></dl></div><div class="probe-row"><h5>② 命令行传入 -2</h5><dl><div><dt>应当看到</dt><dd>小于 0，应报错。</dd></div><div><dt>实际看到</dt><dd>取绝对值后返回 2，把非法值改成了合法值。</dd></div></dl></div><div class="probe-row"><h5>③ 命令行传入 12</h5><dl><div><dt>应当看到</dt><dd>超过上限 10，应报错。</dd></div><div><dt>实际看到</dt><dd>自动截断并返回 10，调用者不知道原配置有误。</dd></div></dl></div><div class="probe-row"><h5>④ 无命令行参数；环境变量为“auto”，配置文件为 1</h5><dl><div><dt>应当看到</dt><dd>环境变量优先，但值非法；应报错，不能回退。</dd></div><div><dt>实际看到</dt><dd>忽略环境变量，返回文件里的 1。程序用了用户没有选定的低优先级配置。</dd></div></dl></div></div></div></li><li><span class="sequence" aria-hidden="true">3</span><div><h4>把“应该拒绝什么”也写进测试</h4><p>分别补上带单位字符串、负数、超范围值和非法高优先级值的检查；必须收到约定的错误，不能接受任意返回值。每类再换一组输入，避免只覆盖这几个样例。用符合需求的实现与这份多分支实现一起回归，确认正常输入仍通过，错误的容错行为会失败。</p></div></li></ol>
+   <div class="deep-decision"><strong>最后怎么判</strong><p>四个分支都违反了题目明确约定，相应检查判失败。原测试缺少“必须拒绝”的场景，也要补齐。模型代码应遵守统一的校验规则，不能把自己猜的测试偏好变成新需求。</p></div><p class="deep-boundary">分支多、考虑过隐藏测试，本身都不是扣分理由。这里判错的是可观察的行为：本该报错，却静默纠正或回退。合理的兼容处理若不违反需求，不应被误判。</p>
+  </div>
+ </details><details class="deep-case" id="quality-case-dependencies">
+  <summary><span class="deep-case-tag">05 / 评分过程失真</span><h3>改动测试环境，造成假通过</h3><p>模型改动测试依赖或运行配置，导致评分检查被跳过或失效。</p><span class="deep-case-action">评测过程 <span aria-hidden="true">+</span></span></summary>
+  <div class="deep-case-content">
+   <header class="deep-example-heading"><p>具体例子</p><h4>报告没有失败，是因为该测的根本没跑</h4><p>模型没有实现订单去重，却通过改动测试依赖与运行配置，让相关检查被跳过。“全绿”掩盖了缺失的验证。</p></header>
+   <div class="deep-request"><strong>这道题的要求</strong><div><p>把 CSV 订单写入持久数据库，以 order_id 去重：已有订单不重复写入、不覆盖，返回本次新增数量，重启后仍须遵守。可以修改业务代码及允许的应用依赖；正式评分的测试、测试依赖和运行配置由评测方固定，不属于模型可修改的范围。</p></div></div>
+   <ol class="deep-steps"><li><span class="sequence" aria-hidden="true">1</span><div><h4>先追查“通过”是怎么产生的</h4><p>这份候选代码没有修好去重，却改动了测试依赖与运行配置。示例中，原定 12 条检查只执行了首次导入相关的 3 条，其余 9 条被跳过。若评测只读“0 failed”或进程正常退出，就会误记通过。</p></div></li><li><span class="sequence" aria-hidden="true">2</span><div><h4>核对实际执行记录，再放回可信环境重跑</h4><p>先比对预定用例与真实执行记录，连同跳过原因一起检查；用例总数相同也不代表跑的是同一批。再在评测方固定的测试环境中，只应用任务允许的业务变更，重新验证。</p><div class="review-probes"><div class="probe-row"><h5>检查评分命令的结果</h5><dl><div><dt>应当看到</dt><dd>所有应测项目执行完毕，且结果来自实际检查。</dd></div><div><dt>实际看到</dt><dd>退出码为 0、报告没有失败；这些信息还不足以证明任务完成。</dd></div></dl></div><div class="probe-row"><h5>核对本次执行了哪些用例</h5><dl><div><dt>应当看到</dt><dd>本例预定的 12 条检查逐项执行，没有意外跳过。</dd></div><div><dt>实际看到</dt><dd>只执行 3 条；9 条未执行，其中包括重复导入检查。</dd></div></dl></div><div class="probe-row"><h5>固定测试环境，再导入两次</h5><dl><div><dt>应当看到</dt><dd>第一次新增 2，第二次新增 0；库中始终只有 2 条。</dd></div><div><dt>实际看到</dt><dd>第二次仍新增 2；库中变成 4 条。业务问题没有修好。</dd></div></dl></div></div></div></li><li><span class="sequence" aria-hidden="true">3</span><div><h4>修复评分入口，阻止“没跑”变成“过了”</h4><p>正式评分使用评测方保存的测试及其依赖，不继承候选代码对这部分的修改。逐项核对哪些检查确实执行；缺失或意外跳过时，不能记为通过。分别用正确实现和这份有问题的提交验证：前者正常通过，后者会被拦下。</p></div></li></ol>
+   <div class="deep-decision"><strong>最后怎么判</strong><p>原来的“通过”不能采信：评分过程已受影响。记录越界修改，并以可信环境重跑后的业务结果判断；这里去重检查失败。其他处罚是否适用，必须按事先公布的规则处理。</p></div><p class="deep-boundary">改依赖不自动等于作弊。允许范围内的业务依赖升级可以合理；关键是有没有越过边界、改变评分检查。若原任务没说清边界，先由人确认规则与受影响结果的处理方式。</p>
+  </div>
+ </details></div></section>
+ <section class="quality-flow section-space" aria-labelledby="flow-title"><div class="section-heading"><h2 id="flow-title">把这些判断，做成可复用的 review pipeline</h2><p>先验证评测器、逐条审断言；跑分后用关键失败找出前一轮漏掉的问题，再回到修订与复验。</p></div><div class="flow-meta"><p>选择一步，查看具体判断方法</p><div class="legend"><span class="owner-label automation">自动审查 / 执行验证</span><span class="owner-label human">人工决策</span></div></div><ol class="review-flow"><li><button data-step="0" class="flow-node automation" aria-pressed="false" aria-controls="handoff-panel"><span class="flow-node-top"><span class="sequence">1</span><span>自动审查 / 执行验证</span></span><strong>先让正确解跑通</strong><span class="flow-node-brief">同一版本、同一评分环境</span></button><span class="flow-arrow" aria-hidden="true">→</span></li><li><button data-step="1" class="flow-node automation" aria-pressed="false" aria-controls="handoff-panel"><span class="flow-node-top"><span class="sequence">2</span><span>自动审查 / 执行验证</span></span><strong>多评委独立审题</strong><span class="flow-node-brief">先各自判断，保留依据与分歧</span></button><span class="flow-arrow" aria-hidden="true">→</span></li><li><button data-step="2" class="flow-node automation" aria-pressed="true" aria-controls="handoff-panel"><span class="flow-node-top"><span class="sequence">3</span><span>自动审查 / 执行验证</span></span><strong>汇总证据与分歧</strong><span class="flow-node-brief">回到题面，检查不同判断的理由</span></button><span class="flow-arrow" aria-hidden="true">→</span></li><li><button data-step="3" class="flow-node human" aria-pressed="false" aria-controls="handoff-panel"><span class="flow-node-top"><span class="sequence">4</span><span>人工决策</span></span><strong>确认修法与重跑</strong><span class="flow-node-brief">题面、测试、计分范围分别处理</span></button><span class="flow-arrow" aria-hidden="true">→</span></li><li><button data-step="4" class="flow-node automation" aria-pressed="false" aria-controls="handoff-panel"><span class="flow-node-top"><span class="sequence">5</span><span>自动审查 / 执行验证</span></span><strong>盲审决定成绩的测试</strong><span class="flow-node-brief">唯一未过、反复失败、全部失败</span></button><span class="flow-arrow" aria-hidden="true">→</span></li><li><button data-step="5" class="flow-node human" aria-pressed="false" aria-controls="handoff-panel"><span class="flow-node-top"><span class="sequence">6</span><span>人工决策</span></span><strong>确认版本与成绩影响</strong><span class="flow-node-brief">修误拒与补漏检，分别定生效边界</span></button></li></ol><div class="review-loop"><span aria-hidden="true">↶</span><button data-return="3">盲审确认题目有问题，回到修订与复验</button></div><div id="handoff-panel" class="handoff-panel automation" aria-live="polite"><div class="handoff-heading"><span class="owner-label automation">自动审查 / 执行验证</span><h3>汇总证据与分歧</h3><p>先由主控 Agent 对照题面、测试和各评委的理由复核分歧，形成处理建议。</p><a class="mobile-flow-back" href="#flow-title">返回流程图</a></div><dl class="handoff-content"><div><dt>先查理由</dt><dd>逐条核对争议测试：题面是否真的提出了这个要求？已有引用能否支持评委的结论？</dd></div><div><dt>再查证据</dt><dd>检查是否存在满足题面却被判错的实现，也回查全文和适用规则，避免误删合理测试。</dd></div><div><dt>交给人什么</dt><dd>需要改题、修改规则或证据仍有冲突时，整理依据、可选做法和成绩影响，交给人确认。人无需先完整试评题集。</dd></div></dl></div><p class="flow-note">蓝色环节提出证据与建议；金色环节由人决定规则、修订及成绩的生效边界。</p><aside class="judge-iteration" aria-labelledby="judge-iteration-title"><div><p class="iteration-label">后期按需</p><h3 id="judge-iteration-title">积累结果后，再看评委有没有偏差</h3></div><div><p>如果某位评委反复放过有问题的测试，或反复否定已经确认合理的测试，再用这些已核实案例检查它的判断。</p><p>据此调整审题提示、评委组合或合议规则，由人确认调整。校准结果用于下一轮审题，不是前期启动的门槛。</p><p class="iteration-path">跑后复核积累案例 → 按需校准 → 下一轮独立审题</p></div></aside></section></main>
+  <div id="site-footer"><footer class="site-footer wrap"><p>Coding Agent 评测 · 研究与实践</p><a class="text-link" href="index.html">回到首页</a></footer></div>
+</body>
+</html>
