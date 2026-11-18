@@ -744,38 +744,25 @@ window.SITE_CONTENT = {
             {
               "id": "quality-case-dependencies",
               "tag": "05 / 评分过程失真",
-              "title": "改写测试依赖的检查函数，造成假通过",
-              "summary": "模型把检查函数换成“什么也不做”，隐藏测试照常执行，却失去了判断对错的能力。",
-              "request": "修复 total(numbers)，返回所有数字之和。模型提交后，评测方才注入隐藏测试，检查 total([10, 20]) 是否等于 30。",
-              "exampleTitle": "把 assertEqual 换成空函数，10 和 30 不相等也不报错",
-              "exampleIntro": "正常的 assertEqual 会比较两个值，不相等就报错。本例模拟模型把它换成直接返回的空函数：业务代码仍算出 10，测试却显示 OK。这是本地实跑的教学复现。",
+              "title": "改写检查函数，造成假通过",
+              "summary": "模型改掉测试依赖的函数，让错误结果也被放过。",
+              "request": "输入 [10, 20] 应返回 30；模型提交后，评测方才注入隐藏测试。",
+              "exampleTitle": "把 assertEqual 换成空函数",
+              "exampleIntro": "本地实跑示例：求和仍算错，测试却通过了。",
               "sample": null,
-              "files": [
-                {
-                  "path": "solution.py",
-                  "role": "模型提交的文件。求和逻辑没修，只额外加入替换检查函数的代码。"
-                },
-                {
-                  "path": "TestCase.assertEqual",
-                  "role": "测试依赖的“判断两值是否相等”方法。被替换的是运行时的方法，未修改 Python 安装文件。"
-                },
-                {
-                  "path": "hidden/test_sum.py",
-                  "role": "评测方提交后注入。模型不读取、不修改它；四次验证中内容完全相同。"
-                }
-              ],
+              "files": null,
               "steps": [
                 {
-                  "title": "模型在自己的 solution.py 里，替换了测试会调用的方法",
-                  "body": "solution.py 末尾的 total 仍然只返回第一个数字。真正新增的是 skip_check 和赋值语句：把 unittest.TestCase.assertEqual 指向这个空函数。它收到任何两个值都直接 return，既不比较，也不抛出失败异常。"
+                  "title": "改了什么",
+                  "body": "模型在 solution.py 中，把 assertEqual 换成不做比较的空函数；求和代码仍返回错误的 10。"
                 },
                 {
-                  "title": "隐藏测试没改，但运行时调用到了这个空函数",
-                  "body": "隐藏测试先导入 solution，这一步会执行 solution.py 中的替换语句。随后测试通过 self.assertEqual(10, 30) 检查结果；由于测试与候选代码共用同一 Python 进程，它实际调用的是 skip_check。函数直接返回，框架没有收到断言失败，于是记为 OK。这个替换不需要知道隐藏测试输入什么数字。"
+                  "title": "为什么假通过",
+                  "body": "隐藏测试照常调用 assertEqual(10, 30)，实际执行的是空函数：没有报错，就记为通过。"
                 },
                 {
-                  "title": "复查依赖是否被覆盖，再恢复原检查重跑",
-                  "body": "复查时先保存原版 assertEqual，加载同一份候选代码后把它恢复，再执行同一份隐藏测试：10 与 30 不相等，重新失败。只有把 total 真正修成 return sum(numbers)，原检查才能通过。质量审核应追查这种对评分依赖的改动，并在可信的评分环境中重跑。"
+                  "title": "怎么复查",
+                  "body": "恢复原检查函数，同一份提交重新失败；修好求和代码后，才真正通过。"
                 }
               ],
               "signalPath": "算出错误结果 10 → 隐藏测试调用 assertEqual(10, 30) → 实际执行 skip_check → 没有报错 → 假通过",
@@ -807,14 +794,14 @@ window.SITE_CONTENT = {
                   "observed": "OK · 实际结果 30 · 退出码 0"
                 }
               ],
-              "decision": "第二次的通过无效：检查函数已被替换，业务功能并没有修好。测试文件保密且未改动，还不足以保证评分有效；它调用的检查函数也必须可信。",
-              "boundary": "成立条件：候选代码与测试在同一进程，且测试调用被覆盖的 assertEqual。普通 Python assert 不会被这几行代码直接改掉。恢复这个已知函数只用于核实原因，不是通用的隔离方案。",
+              "decision": "审核不仅看测试内容，还要查它依赖的检查函数是否被改写。",
+              "boundary": "本例前提：代码与测试共用同一进程，测试调用 assertEqual。",
               "reproduction": {
                 "title": "已实跑验证 · 四次都执行了同一条隐藏测试",
                 "environment": "Python 3.11.12 · 标准库 unittest · 2026-11-18",
                 "integrity": "四次隐藏测试的文件校验值一致；前三次求和函数一致。第二、三次使用完全相同的候选文件，只改变评测时是否恢复原检查函数。",
                 "detailsLabel": "查看复现脚本与实测记录",
-                "setupNote": "仅需 Python 3，无须安装第三方包。脚本在临时目录和独立子进程内演示，不改现有项目或已安装的库。",
+                "setupNote": "仅需 Python 3，无须安装第三方包。脚本在临时目录和独立子进程内演示，不改现有项目或已安装的库。 普通 Python assert 不受这次替换直接影响；恢复已知函数只用于核实原因，不是通用隔离方案。",
                 "command": "python3 assertion-dependency-demo.py",
                 "demoLabel": "下载最小复现脚本",
                 "demoUrl": "examples/assertion-dependency-demo.py",
@@ -827,7 +814,8 @@ window.SITE_CONTENT = {
                     "url": "https://docs.python.org/3/library/unittest.html#unittest.TestCase.assertEqual"
                   }
                 ]
-              }
+              },
+              "technicalDetailsLabel": "查看代码与实测记录"
             }
           ],
           "exampleLabel": "具体例子"
@@ -1804,38 +1792,25 @@ window.SITE_CONTENT = {
             {
               "id": "quality-case-dependencies",
               "tag": "05 / Scoring interference",
-              "title": "Replacing a test dependency creates a false pass",
-              "summary": "The agent replaces an assertion method with a no-op. Hidden tests still run, but can no longer distinguish correct results from wrong ones.",
-              "request": "Fix total(numbers) to sum every number. Only after submission does the evaluator inject a hidden test checking whether total([10, 20]) equals 30.",
-              "exampleTitle": "Replace assertEqual with a no-op: 10 and 30 no longer trigger a failure",
-              "exampleIntro": "Normally, assertEqual compares two values and fails when they differ. This locally executed teaching example simulates replacing it with an empty function: the implementation still returns 10, but the test reports OK.",
+              "title": "Replacing an assertion creates a false pass",
+              "summary": "The agent replaces a test dependency so wrong results slip through.",
+              "request": "Input [10, 20] must return 30. The evaluator injects the hidden test only after submission.",
+              "exampleTitle": "Replace assertEqual with a no-op",
+              "exampleIntro": "Locally verified example: the sum stays wrong, but the test passes.",
               "sample": null,
-              "files": [
-                {
-                  "path": "solution.py",
-                  "role": "The submitted file. The summation logic stays wrong; additional code replaces the assertion method."
-                },
-                {
-                  "path": "TestCase.assertEqual",
-                  "role": "The equality check used by the test. Its runtime method is replaced; no Python installation file is edited."
-                },
-                {
-                  "path": "hidden/test_sum.py",
-                  "role": "Injected by the evaluator after submission. The candidate neither reads nor edits it; all four runs use identical test contents."
-                }
-              ],
+              "files": null,
               "steps": [
                 {
-                  "title": "The agent replaces a test dependency from its own solution.py",
-                  "body": "The total function at the end of solution.py still returns only the first number. The additions define skip_check and assign it to unittest.TestCase.assertEqual. Whatever values it receives, this empty function returns without comparing them or raising an assertion failure."
+                  "title": "What changed",
+                  "body": "In solution.py, the agent replaces assertEqual with a function that does no comparison. The sum still returns the wrong result, 10."
                 },
                 {
-                  "title": "The unchanged hidden test calls the replacement method",
-                  "body": "The hidden test first imports solution, executing the replacement in solution.py. It then calls self.assertEqual(10, 30). Because the test and candidate share one Python process, this resolves to skip_check. The function returns without an assertion failure, so the framework records OK. The replacement does not need to know which numbers the hidden test uses."
+                  "title": "Why it falsely passes",
+                  "body": "The hidden test calls assertEqual(10, 30), but the no-op runs instead. No failure is raised, so the test passes."
                 },
                 {
-                  "title": "Check for overridden dependencies, then restore the original assertion",
-                  "body": "For diagnosis, the evaluator saves the original assertEqual, imports the identical candidate file, restores that method, and runs the identical hidden test. Comparing 10 with 30 now fails again. Only fixing total to return sum(numbers) passes the original check. Quality review should trace such changes to scoring dependencies and rerun submissions in a trusted evaluation environment."
+                  "title": "How to verify",
+                  "body": "Restore the original assertion: the identical submission fails again. Fix the summation code, and it truly passes."
                 }
               ],
               "signalPath": "Wrong result: 10 → Hidden test calls assertEqual(10, 30) → skip_check runs → No failure raised → False pass",
@@ -1867,14 +1842,14 @@ window.SITE_CONTENT = {
                   "observed": "OK · Actual result: 30 · Exit code: 0"
                 }
               ],
-              "decision": "The second pass is invalid: the assertion was replaced while the required function remained wrong. Keeping test files secret and unchanged is insufficient; the checks they call must also be trustworthy.",
-              "boundary": "Required conditions: candidate and tests share one process, and the test calls the overridden assertEqual. These lines do not directly replace ordinary Python assert statements. Restoring this known method is a diagnostic control, not a general isolation mechanism.",
+              "decision": "Review the test and whether its assertion dependencies have been replaced.",
+              "boundary": "Precondition: candidate and tests share a process, and the test calls assertEqual.",
               "reproduction": {
                 "title": "Verified by execution · The same hidden test ran in all four cases",
                 "environment": "Python 3.11.12 · Standard-library unittest · 2026-11-18",
                 "integrity": "All four hidden-test file hashes match, as do the first three summation functions. Runs two and three use the identical submitted file; only restoration of the original assertion differs.",
                 "detailsLabel": "Reproduce the example and inspect the run record",
-                "setupNote": "Requires Python 3 only, with no third-party packages. The script uses temporary directories and separate child processes; it does not alter existing projects or installed libraries.",
+                "setupNote": "Requires Python 3 only, with no third-party packages. The script uses temporary directories and separate child processes; it does not alter existing projects or installed libraries. Ordinary Python assert is not directly affected. Restoring this known method is a diagnostic control, not general isolation.",
                 "command": "python3 assertion-dependency-demo.py",
                 "demoLabel": "Download the reproduction script",
                 "demoUrl": "examples/assertion-dependency-demo.py",
@@ -1887,7 +1862,8 @@ window.SITE_CONTENT = {
                     "url": "https://docs.python.org/3/library/unittest.html#unittest.TestCase.assertEqual"
                   }
                 ]
-              }
+              },
+              "technicalDetailsLabel": "View code and measured results"
             }
           ],
           "exampleLabel": "Example walkthrough"

@@ -1,4 +1,4 @@
-import {renderPage,renderHeader,renderFooter,renderQualityPanel,pageTitle} from './render.js?v=8191a0313981';
+import {renderPage,renderHeader,renderFooter,renderQualityPanel,pageTitle} from './render.js?v=01fdea041f5a';
 const {locales,papers}=window.SITE_CONTENT;
 const page=document.body.dataset.page;
 let language='zh',activeStep=2;
