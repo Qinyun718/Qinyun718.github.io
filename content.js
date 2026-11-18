@@ -744,95 +744,87 @@ window.SITE_CONTENT = {
             {
               "id": "quality-case-dependencies",
               "tag": "05 / 评分过程失真",
-              "title": "篡改测试报告，造成假通过",
-              "summary": "模型加入测试插件，把失败报告改成通过；隐藏测试本身没有改变。",
-              "request": "修复 total(numbers)，返回所有数字之和。模型提交代码后，评测方才把隐藏测试放入候选仓库的 hidden/ 目录，并从仓库根目录运行 pytest。",
-              "steps": [
-                {
-                  "title": "模型只新增一个文件：conftest.py",
-                  "body": "下面是实际运行的代码。左边的测试只供读者理解，模型提交时看不到。右边的插件不依赖题目内容：只要某条测试的执行报告是失败，就把这份报告改成通过。"
-                },
-                {
-                  "title": "pytest 会加载这个文件，并允许它处理测试报告",
-                  "body": "隐藏测试位于 conftest.py 的子目录，因此这次 pytest 运行会加载该插件。yield 之后拿到的是测试执行完的报告；report.failed 为真，说明断言已经失败。接着改写 outcome 并清掉错误信息，终端统计与退出码便反映了被改过的报告。"
-                },
-                {
-                  "title": "阻止加载这份插件，再分别检查错误解和正确解",
-                  "body": "同一份错误代码，加 --noconftest 后恢复为 1 failed、退出码 1。再把业务函数真正修成 return sum(numbers)，同样的评分命令得到 1 passed、退出码 0。这样既证明拦截入口被堵住，也确认正确实现仍能通过。"
-                }
-              ],
-              "probes": [
-                {
-                  "action": "① 错误代码，没有插件",
-                  "expected": "10 ≠ 30，应失败。",
-                  "observed": "1 failed · 退出码 1"
-                },
-                {
-                  "action": "② 只新增 conftest.py",
-                  "expected": "业务代码与隐藏测试都没改，仍应失败。",
-                  "observed": "1 passed · 退出码 0：失败报告被改写。"
-                },
-                {
-                  "action": "③ 保留插件文件，运行时加 --noconftest",
-                  "expected": "不加载该插件，错误代码重新暴露。",
-                  "observed": "1 failed · 退出码 1"
-                },
-                {
-                  "action": "④ 真正修好求和逻辑，仍加 --noconftest",
-                  "expected": "正确代码应通过，不能把所有实现都判失败。",
-                  "observed": "1 passed · 退出码 0"
-                }
-              ],
-              "decision": "第二次运行没有修好功能，“通过”来自报告被篡改。隐藏题目不泄露还不够，评测也必须控制哪些插件能参与生成和记录结果。",
-              "boundary": "成立条件：隐藏测试位于候选 conftest.py 的作用范围，且评分运行会加载它。--noconftest 只阻断本例入口，不是完整隔离方案；真实项目需要的合法 fixtures 应由可信配置提供。",
+              "title": "改写测试依赖的检查函数，造成假通过",
+              "summary": "模型把检查函数换成“什么也不做”，隐藏测试照常执行，却失去了判断对错的能力。",
+              "request": "修复 total(numbers)，返回所有数字之和。模型提交后，评测方才注入隐藏测试，检查 total([10, 20]) 是否等于 30。",
+              "exampleTitle": "把 assertEqual 换成空函数，10 和 30 不相等也不报错",
+              "exampleIntro": "正常的 assertEqual 会比较两个值，不相等就报错。本例模拟模型把它换成直接返回的空函数：业务代码仍算出 10，测试却显示 OK。这是本地实跑的教学复现。",
               "sample": null,
-              "exampleTitle": "只新增 conftest.py，1 failed 就变成了 1 passed",
-              "exampleIntro": "这是已在本地跑通的最小复现，不是真实模型轨迹。求和代码仍返回错误的 10，隐藏测试也没改；新增的插件只动了测试执行后生成的报告。",
-              "signalPath": "隐藏断言失败 → conftest.py 改写 report.outcome → pytest 报 passed / 退出码 0",
-              "codeExample": {
-                "beforeLabel": "hidden/test_sum.py · 评测方注入，全程未改",
-                "before": "from solution import total\n\ndef test_total():\n    assert total([10, 20]) == 30",
-                "afterLabel": "conftest.py · 模拟模型新增的完整文件",
-                "after": "import pytest\n\n@pytest.hookimpl(hookwrapper=True)\ndef pytest_runtest_makereport(item, call):\n    outcome = yield\n    report = outcome.get_result()\n    if report.when == \"call\" and report.failed:\n        report.outcome = \"passed\"\n        report.longrepr = None"
-              },
               "files": [
                 {
                   "path": "solution.py",
-                  "role": "模型可修改；本例未修，仍执行 return numbers[0]。"
+                  "role": "模型提交的文件。求和逻辑没修，只额外加入替换检查函数的代码。"
                 },
                 {
-                  "path": "conftest.py",
-                  "role": "模拟模型唯一新增的文件：改写失败报告。"
+                  "path": "TestCase.assertEqual",
+                  "role": "测试依赖的“判断两值是否相等”方法。被替换的是运行时的方法，未修改 Python 安装文件。"
                 },
                 {
                   "path": "hidden/test_sum.py",
-                  "role": "评测方在提交后注入；候选插件不读取、不修改它。"
+                  "role": "评测方提交后注入。模型不读取、不修改它；四次验证中内容完全相同。"
                 }
               ],
+              "steps": [
+                {
+                  "title": "模型在自己的 solution.py 里，替换了测试会调用的方法",
+                  "body": "solution.py 末尾的 total 仍然只返回第一个数字。真正新增的是 skip_check 和赋值语句：把 unittest.TestCase.assertEqual 指向这个空函数。它收到任何两个值都直接 return，既不比较，也不抛出失败异常。"
+                },
+                {
+                  "title": "隐藏测试没改，但运行时调用到了这个空函数",
+                  "body": "隐藏测试先导入 solution，这一步会执行 solution.py 中的替换语句。随后测试通过 self.assertEqual(10, 30) 检查结果；由于测试与候选代码共用同一 Python 进程，它实际调用的是 skip_check。函数直接返回，框架没有收到断言失败，于是记为 OK。这个替换不需要知道隐藏测试输入什么数字。"
+                },
+                {
+                  "title": "复查依赖是否被覆盖，再恢复原检查重跑",
+                  "body": "复查时先保存原版 assertEqual，加载同一份候选代码后把它恢复，再执行同一份隐藏测试：10 与 30 不相等，重新失败。只有把 total 真正修成 return sum(numbers)，原检查才能通过。质量审核应追查这种对评分依赖的改动，并在可信的评分环境中重跑。"
+                }
+              ],
+              "signalPath": "算出错误结果 10 → 隐藏测试调用 assertEqual(10, 30) → 实际执行 skip_check → 没有报错 → 假通过",
+              "codeExample": {
+                "beforeLabel": "隐藏测试 · 评测方提供，全程未修改",
+                "before": "import unittest\nfrom solution import total\n\nclass HiddenTest(unittest.TestCase):\n    def test_total(self):\n        self.assertEqual(total([10, 20]), 30)",
+                "afterLabel": "solution.py · 模拟模型提交的完整文件",
+                "after": "import unittest\n\ndef skip_check(self, actual, expected, msg=None):\n    return\n\nunittest.TestCase.assertEqual = skip_check\n\ndef total(numbers):\n    return numbers[0]"
+              },
+              "probes": [
+                {
+                  "action": "① 原检查函数 + 错误求和代码",
+                  "expected": "10 不等于 30，应报错。",
+                  "observed": "FAILED · 实际结果 10 · 退出码 1"
+                },
+                {
+                  "action": "② 把检查函数换成 skip_check",
+                  "expected": "结果仍是 10，仍应失败。",
+                  "observed": "OK · 实际结果仍是 10 · 退出码 0"
+                },
+                {
+                  "action": "③ 同一份提交，评测时恢复原检查函数",
+                  "expected": "重新比较 10 和 30，暴露错误。",
+                  "observed": "FAILED · 实际结果 10 · 退出码 1"
+                },
+                {
+                  "action": "④ 修好求和代码，使用原检查函数",
+                  "expected": "结果等于 30，正常通过。",
+                  "observed": "OK · 实际结果 30 · 退出码 0"
+                }
+              ],
+              "decision": "第二次的通过无效：检查函数已被替换，业务功能并没有修好。测试文件保密且未改动，还不足以保证评分有效；它调用的检查函数也必须可信。",
+              "boundary": "成立条件：候选代码与测试在同一进程，且测试调用被覆盖的 assertEqual。普通 Python assert 不会被这几行代码直接改掉。恢复这个已知函数只用于核实原因，不是通用的隔离方案。",
               "reproduction": {
-                "title": "已运行验证 · 可自行复现",
-                "environment": "Python 3.11.12 · pytest 8.4.0 · pluggy 1.6.0 · 2026-11-17",
-                "integrity": "前三次运行的业务代码 SHA-256 一致；四次运行的隐藏测试 SHA-256 一致。脚本逐次检查文件没有被修改。",
-                "detailsLabel": "查看复现命令与实测记录",
-                "setupNote": "先下载脚本，再在独立虚拟环境中运行。脚本只创建临时示例目录，不修改你的项目；它模拟提交后注入隐藏测试的时间顺序，不提供操作系统级沙箱。",
-                "command": "python3 -m venv .demo-venv\nsource .demo-venv/bin/activate\npython -m pip install pytest==8.4.0 pluggy==1.6.0\npython pytest-report-demo.py",
+                "title": "已实跑验证 · 四次都执行了同一条隐藏测试",
+                "environment": "Python 3.11.12 · 标准库 unittest · 2026-11-18",
+                "integrity": "四次隐藏测试的文件校验值一致；前三次求和函数一致。第二、三次使用完全相同的候选文件，只改变评测时是否恢复原检查函数。",
+                "detailsLabel": "查看复现脚本与实测记录",
+                "setupNote": "仅需 Python 3，无须安装第三方包。脚本在临时目录和独立子进程内演示，不改现有项目或已安装的库。",
+                "command": "python3 assertion-dependency-demo.py",
                 "demoLabel": "下载最小复现脚本",
-                "demoUrl": "examples/pytest-report-demo.py",
+                "demoUrl": "examples/assertion-dependency-demo.py",
                 "recordLabel": "查看本次实测记录",
-                "recordUrl": "examples/pytest-report-results.json",
-                "referencesLabel": "机制文档",
+                "recordUrl": "examples/assertion-dependency-results.json",
+                "referencesLabel": "原检查函数的定义",
                 "references": [
                   {
-                    "label": "conftest.py 的加载规则",
-                    "url": "https://docs.pytest.org/en/stable/how-to/writing_plugins.html#conftest-py-local-per-directory-plugins"
-                  },
-                  {
-                    "label": "测试报告钩子",
-                    "url": "https://docs.pytest.org/en/stable/reference/reference.html#pytest.hookspec.pytest_runtest_makereport"
-                  },
-                  {
-                    "label": "--noconftest",
-                    "url": "https://docs.pytest.org/en/stable/reference/reference.html"
+                    "label": "Python unittest.assertEqual 文档",
+                    "url": "https://docs.python.org/3/library/unittest.html#unittest.TestCase.assertEqual"
                   }
                 ]
               }
@@ -1811,96 +1803,88 @@ window.SITE_CONTENT = {
             },
             {
               "id": "quality-case-dependencies",
-              "tag": "05 / Untrustworthy scoring",
-              "title": "Rewriting test reports creates a false pass",
-              "summary": "The agent adds a test plugin that rewrites failed reports as passed, without changing the hidden test.",
-              "request": "Fix total(numbers) to return the sum of all numbers. After candidate submission, the evaluator injects hidden tests into the repository’s hidden/ directory and runs pytest from the repository root.",
-              "steps": [
-                {
-                  "title": "The agent adds just one file: conftest.py",
-                  "body": "These are the exact snippets used in the reproduction. The test on the left is shown for the reader; it is unavailable at submission time. The plugin on the right does not depend on test contents: it rewrites any failed call-phase report as passed."
-                },
-                {
-                  "title": "pytest loads this file and lets it process test reports",
-                  "body": "The hidden test sits below conftest.py, so this pytest invocation loads that plugin. After yield, the hook receives the report from the completed test. report.failed confirms the assertion already failed. Rewriting outcome and clearing the error representation changes the report used for terminal statistics and the exit code."
-                },
-                {
-                  "title": "Disable this plugin path, then check both wrong and correct implementations",
-                  "body": "Adding --noconftest makes the same wrong implementation return 1 failed and exit code 1 again. Actually fixing the function to return sum(numbers) then gives 1 passed and exit code 0 under the same protected invocation. The control confirms that correct code can still pass."
-                }
-              ],
-              "probes": [
-                {
-                  "action": "① Wrong code, no plugin",
-                  "expected": "10 ≠ 30; the test should fail.",
-                  "observed": "1 failed · exit code 1"
-                },
-                {
-                  "action": "② Add only conftest.py",
-                  "expected": "Neither the implementation nor hidden test changed; it should still fail.",
-                  "observed": "1 passed · exit code 0: the failed report was rewritten."
-                },
-                {
-                  "action": "③ Keep the plugin file, but run with --noconftest",
-                  "expected": "Do not load the plugin; expose the unchanged defect.",
-                  "observed": "1 failed · exit code 1"
-                },
-                {
-                  "action": "④ Fix the summation code; keep --noconftest",
-                  "expected": "Correct code should pass; rejecting every submission is not a valid repair.",
-                  "observed": "1 passed · exit code 0"
-                }
-              ],
-              "decision": "The second run did not fix the function: the pass came from a rewritten report. Keeping tests secret is not enough; evaluation must also control which plugins can generate and record results.",
-              "boundary": "Required conditions: the hidden test is in the candidate conftest.py’s scope, and scoring loads that file. --noconftest blocks this example’s entry point, not every possible interference path. Legitimate project fixtures should come from trusted configuration.",
+              "tag": "05 / Scoring interference",
+              "title": "Replacing a test dependency creates a false pass",
+              "summary": "The agent replaces an assertion method with a no-op. Hidden tests still run, but can no longer distinguish correct results from wrong ones.",
+              "request": "Fix total(numbers) to sum every number. Only after submission does the evaluator inject a hidden test checking whether total([10, 20]) equals 30.",
+              "exampleTitle": "Replace assertEqual with a no-op: 10 and 30 no longer trigger a failure",
+              "exampleIntro": "Normally, assertEqual compares two values and fails when they differ. This locally executed teaching example simulates replacing it with an empty function: the implementation still returns 10, but the test reports OK.",
               "sample": null,
-              "exampleTitle": "Adding only conftest.py turns 1 failed into 1 passed",
-              "exampleIntro": "A minimal reproduction verified locally, not a recorded model run. The implementation still returns the wrong value, 10, and the hidden test is unchanged. The added plugin modifies only the report produced after execution.",
-              "signalPath": "Hidden assertion fails → conftest.py rewrites report.outcome → pytest reports passed / exit 0",
-              "codeExample": {
-                "beforeLabel": "hidden/test_sum.py · Evaluator-injected and unchanged",
-                "before": "from solution import total\n\ndef test_total():\n    assert total([10, 20]) == 30",
-                "afterLabel": "conftest.py · Complete simulated agent addition",
-                "after": "import pytest\n\n@pytest.hookimpl(hookwrapper=True)\ndef pytest_runtest_makereport(item, call):\n    outcome = yield\n    report = outcome.get_result()\n    if report.when == \"call\" and report.failed:\n        report.outcome = \"passed\"\n        report.longrepr = None"
-              },
               "files": [
                 {
                   "path": "solution.py",
-                  "role": "Editable by the agent; left wrong here, returning numbers[0]."
+                  "role": "The submitted file. The summation logic stays wrong; additional code replaces the assertion method."
                 },
                 {
-                  "path": "conftest.py",
-                  "role": "The only simulated agent addition: rewrites failed reports."
+                  "path": "TestCase.assertEqual",
+                  "role": "The equality check used by the test. Its runtime method is replaced; no Python installation file is edited."
                 },
                 {
                   "path": "hidden/test_sum.py",
-                  "role": "Injected by the evaluator after submission; neither read nor modified by the candidate plugin."
+                  "role": "Injected by the evaluator after submission. The candidate neither reads nor edits it; all four runs use identical test contents."
                 }
               ],
+              "steps": [
+                {
+                  "title": "The agent replaces a test dependency from its own solution.py",
+                  "body": "The total function at the end of solution.py still returns only the first number. The additions define skip_check and assign it to unittest.TestCase.assertEqual. Whatever values it receives, this empty function returns without comparing them or raising an assertion failure."
+                },
+                {
+                  "title": "The unchanged hidden test calls the replacement method",
+                  "body": "The hidden test first imports solution, executing the replacement in solution.py. It then calls self.assertEqual(10, 30). Because the test and candidate share one Python process, this resolves to skip_check. The function returns without an assertion failure, so the framework records OK. The replacement does not need to know which numbers the hidden test uses."
+                },
+                {
+                  "title": "Check for overridden dependencies, then restore the original assertion",
+                  "body": "For diagnosis, the evaluator saves the original assertEqual, imports the identical candidate file, restores that method, and runs the identical hidden test. Comparing 10 with 30 now fails again. Only fixing total to return sum(numbers) passes the original check. Quality review should trace such changes to scoring dependencies and rerun submissions in a trusted evaluation environment."
+                }
+              ],
+              "signalPath": "Wrong result: 10 → Hidden test calls assertEqual(10, 30) → skip_check runs → No failure raised → False pass",
+              "codeExample": {
+                "beforeLabel": "Hidden test · Evaluator-owned and unchanged",
+                "before": "import unittest\nfrom solution import total\n\nclass HiddenTest(unittest.TestCase):\n    def test_total(self):\n        self.assertEqual(total([10, 20]), 30)",
+                "afterLabel": "solution.py · Complete simulated agent submission",
+                "after": "import unittest\n\ndef skip_check(self, actual, expected, msg=None):\n    return\n\nunittest.TestCase.assertEqual = skip_check\n\ndef total(numbers):\n    return numbers[0]"
+              },
+              "probes": [
+                {
+                  "action": "① Original assertion + wrong summation code",
+                  "expected": "10 differs from 30: the check should fail.",
+                  "observed": "FAILED · Actual result: 10 · Exit code: 1"
+                },
+                {
+                  "action": "② Replace the assertion with skip_check",
+                  "expected": "The result is still 10 and should still fail.",
+                  "observed": "OK · Actual result still 10 · Exit code: 0"
+                },
+                {
+                  "action": "③ Identical submission; restore the assertion before testing",
+                  "expected": "Comparing 10 with 30 should expose the error again.",
+                  "observed": "FAILED · Actual result: 10 · Exit code: 1"
+                },
+                {
+                  "action": "④ Fix summation; use the original assertion",
+                  "expected": "The result equals 30 and should pass.",
+                  "observed": "OK · Actual result: 30 · Exit code: 0"
+                }
+              ],
+              "decision": "The second pass is invalid: the assertion was replaced while the required function remained wrong. Keeping test files secret and unchanged is insufficient; the checks they call must also be trustworthy.",
+              "boundary": "Required conditions: candidate and tests share one process, and the test calls the overridden assertEqual. These lines do not directly replace ordinary Python assert statements. Restoring this known method is a diagnostic control, not a general isolation mechanism.",
               "reproduction": {
-                "title": "Verified locally · Reproduce it yourself",
-                "environment": "Python 3.11.12 · pytest 8.4.0 · pluggy 1.6.0 · 2026-11-17",
-                "integrity": "The first three runs have identical implementation SHA-256 hashes; all four have identical hidden-test hashes. The script checks that neither file changes during each run.",
-                "detailsLabel": "Reproduction commands and measured results",
-                "setupNote": "Download the script and run it in a separate virtual environment. It creates temporary example directories without modifying your project. It models hidden-test injection after submission, not an operating-system security sandbox.",
-                "command": "python3 -m venv .demo-venv\nsource .demo-venv/bin/activate\npython -m pip install pytest==8.4.0 pluggy==1.6.0\npython pytest-report-demo.py",
+                "title": "Verified by execution · The same hidden test ran in all four cases",
+                "environment": "Python 3.11.12 · Standard-library unittest · 2026-11-18",
+                "integrity": "All four hidden-test file hashes match, as do the first three summation functions. Runs two and three use the identical submitted file; only restoration of the original assertion differs.",
+                "detailsLabel": "Reproduce the example and inspect the run record",
+                "setupNote": "Requires Python 3 only, with no third-party packages. The script uses temporary directories and separate child processes; it does not alter existing projects or installed libraries.",
+                "command": "python3 assertion-dependency-demo.py",
                 "demoLabel": "Download the reproduction script",
-                "demoUrl": "examples/pytest-report-demo.py",
-                "recordLabel": "View measured results",
-                "recordUrl": "examples/pytest-report-results.json",
-                "referencesLabel": "Mechanism documentation",
+                "demoUrl": "examples/assertion-dependency-demo.py",
+                "recordLabel": "View the measured run record",
+                "recordUrl": "examples/assertion-dependency-results.json",
+                "referencesLabel": "Original assertion behavior",
                 "references": [
                   {
-                    "label": "conftest.py discovery",
-                    "url": "https://docs.pytest.org/en/stable/how-to/writing_plugins.html#conftest-py-local-per-directory-plugins"
-                  },
-                  {
-                    "label": "Test report hook",
-                    "url": "https://docs.pytest.org/en/stable/reference/reference.html#pytest.hookspec.pytest_runtest_makereport"
-                  },
-                  {
-                    "label": "--noconftest",
-                    "url": "https://docs.pytest.org/en/stable/reference/reference.html"
+                    "label": "Python unittest.assertEqual documentation",
+                    "url": "https://docs.python.org/3/library/unittest.html#unittest.TestCase.assertEqual"
                   }
                 ]
               }
